@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "technical-director"
+version = "0.1.0"
+description = ""
+authors = ["Andrew Duane <andrew.m.duane@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+python-vlc = "^3.0.11115"
+ffmpy = "^0.2.3"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
