@@ -8,6 +8,7 @@ authors = ["Andrew Duane <andrew.m.duane@gmail.com>"]
 python = "^3.7"
 python-vlc = "^3.0.11115"
 ffmpy = "^0.2.3"
+PyAutoGUI = "^0.9.52"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

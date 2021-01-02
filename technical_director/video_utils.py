@@ -3,6 +3,7 @@ from decimal import Decimal
 import subprocess
 import json
 
+
 def get_video_duration_in_seconds(video_information):
     chapter_info = video_information['chapters']
     if chapter_info:
