@@ -5,10 +5,11 @@ description = ""
 authors = ["Andrew Duane <andrew.m.duane@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.12"
 python-vlc = "^3.0.11115"
 ffmpy = "^0.2.3"
-PyAutoGUI = "^0.9.52"
+requests = "^2.32.3"
+arrow = "^1.3.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

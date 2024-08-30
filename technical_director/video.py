@@ -2,18 +2,27 @@ import uuid
 from video_utils import (
     get_video_information,
     get_video_duration_in_seconds,
+    get_default_video_filepath,
 )
 
 
 class Video:
-    def __init__(self, file_path, batch_label=uuid.uuid4()):
+    @classmethod
+    def default_video(cls):
+        return cls(get_default_video_filepath(), duration_in_seconds=30, label='Dead Air')
+
+    def __init__(self, file_path, batch_label=None, duration_in_seconds=None, label=None):
         self.file_path = file_path
         self._start_at_second = None
         self._end_at_second = None
         # batch_label is used for debugging purposes. Use it to remember what
         # videos were queued as part of the same process.
-        self.batch_label = str(batch_label)
+        self.batch_label = label or batch_label or str(uuid.uuid4())[-6:]
         self.initialize_caches()
+        # If we know the duration upfront, no need to recalculate it.
+        self._duration_in_seconds = duration_in_seconds
+        self.label = label
+
 
     def duration_in_seconds(self):
         if self._duration_in_seconds:

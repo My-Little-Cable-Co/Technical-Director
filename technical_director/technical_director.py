@@ -1,20 +1,45 @@
-import time
 import datetime
-import pyautogui
+import os
 import random
+import re
+import socket
+import time
 from decimal import Decimal
 
 from vlc import EventType
 from vlc_controller import VLCController
-from video import Video
 
 from commercial_utils import get_commercial_break
+from scheduler_client import SchedulerClient
+from video import Video
+
+
+def detect_channel_number() -> str:
+    # If CHANNEL_NUMBER is set in the ENV, use it.
+    channel_number = os.getenv("CHANNEL_NUMBER")
+    if channel_number:
+        return channel_number
+
+    # If we can't get the channel number from the environment, try and parse
+    # it from the hostname based on the MyLittleCableCo hostnaming convention.
+    match = re.match(r"mlcc-(\d+).local", socket.gethostname())
+    if match:
+        return match.group(1)
+
+    # If none of those are available, raise an error, we don't know who we are!
+    # raise IdentityCrisis
+    raise ValueError("Could not find channel number. Set CHANNEL_NUMBER in your environment or set system hostname according to convention.")
+
 
 class TechnicalDirector:
     def __init__(self):
+        self.channel_number = detect_channel_number()
+
+        self.scheduler_client = SchedulerClient()
+
         self.vlc_controller = VLCController()
 
-        # This is the semephore we look for to know if we should advance the
+        # This is the semaphore we look for to know if we should advance the
         # queue. When VLC sends the event that represents the player reaching
         # the end of the currently-playing media, we set this to True, which
         # we then react to in the endless loop.
@@ -29,7 +54,7 @@ class TechnicalDirector:
         scheduling_block = self.get_scheduling_block(time_at_queue_completion)
 
         # Get a Video object for the video that should be airing.
-        target_video = Video(scheduling_block['target_video'])
+        target_video = Video(scheduling_block['file_path'], label=str(scheduling_block['listing_id']))
 
         # See how much time is left in the programming block.
         # Example:
@@ -61,14 +86,15 @@ class TechnicalDirector:
         # Hey there. The reason this just sets a flag and doesn't just start
         # the next video itself is because attempting to call methods on the
         # player object while reacting to a player event causes the player to
-        # hang. Instead this just sets a semephore that is read during the main
+        # hang. Instead this just sets a semaphore that is read during the main
         # loop.
         self.should_move_to_next_video = True
 
     def play_next_video(self):
-        # TODO: Future: except IndexError (no videos queued) and show a
-        # "we'll be right back" image/video.
-        video = self.video_queue.pop(0)
+        try:
+            video = self.video_queue.pop(0)
+        except IndexError:
+            video = Video.default_video()
         media = self.vlc_controller.vlc_instance.media_new(video.file_path)
         # If start_at_second is specified, we don't bother with chapters,
         # commercials, etc. Just queue the video from the time specified.
@@ -149,6 +175,12 @@ class TechnicalDirector:
             # have to fill it, get a list of commercial file paths, grouped by
             # which break to show them in.
             commercial_breaks = self.assemble_commercial_breaks(total_commercial_breaks, block_duration_minus_content_duration_in_seconds)
+            # This counter is used to associate the commercial videos to the
+            # correct commercial break. This allows you to see where one
+            # commercial break ends and one begins when printing the queue,
+            # for example when there are two commercial breaks in a row on the
+            # border of two listings.
+            commercial_break_label = 0
 
             if commercials_before_start:
                 # If we are supposed to have a commercial break before the
@@ -156,14 +188,16 @@ class TechnicalDirector:
                 # create Video objects from each of the file paths, and append
                 # them to the video queue.
                 commercial_break = commercial_breaks.pop()
-                for commercial_file_path in commercial_break:
-                    self.video_queue.append(Video(commercial_file_path, batch_label=target_video.batch_label))
+                for commercial_video in commercial_break:
+                    commercial_video.batch_label = f'{target_video.batch_label}-break#{commercial_break_label}'
+                    self.video_queue.append(commercial_video)
+                commercial_break_label += 1
             if target_video.chapters() and intersperse_commercials:
                 # Since this video has chapters and we've elected to insert
                 # commercials, lets go through each chapter, queue it, then
                 # queue a commercial break after it. Unless it's the last
-                # chapter. When we don't add a commercial break after that one
-                # here. We handle that further down based on the value of
+                # chapter. We don't add a commercial break after that one
+                # here, we handle that further down based on the value of
                 # `commercials_after_end`.
                 for index, chapter in enumerate(target_video.chapters()):
                     video_segment = Video(target_video.file_path, batch_label=target_video.batch_label)
@@ -172,8 +206,10 @@ class TechnicalDirector:
                     self.video_queue.append(video_segment)
                     if index < len(target_video.chapters()) - 1:
                         commercial_break = commercial_breaks.pop()
-                        for commercial_file_path in commercial_break:
-                            self.video_queue.append(Video(commercial_file_path, batch_label=target_video.batch_label))
+                        for commercial_video in commercial_break:
+                            commercial_video.batch_label = f'{target_video.batch_label}-break#{commercial_break_label}'
+                            self.video_queue.append(commercial_video)
+                        commercial_break_label += 1
             else:
                 # Either this video did not have chapter information or we
                 # elected to not insert commercials. In this case, simply queue
@@ -185,8 +221,10 @@ class TechnicalDirector:
                 # create Video objects from each of the file paths, and append
                 # them to the video queue.
                 commercial_break = commercial_breaks.pop()
-                for commercial_file_path in commercial_break:
-                    self.video_queue.append(Video(commercial_file_path, batch_label=target_video.batch_label))
+                for commercial_video in commercial_break:
+                    commercial_video.batch_label = f'{target_video.batch_label}-break#{commercial_break_label}'
+                    self.video_queue.append(commercial_video)
+                commercial_break_label += 1
 
     def assemble_commercial_breaks(self, count, total_length):
         commercial_breaks = []
@@ -201,15 +239,13 @@ class TechnicalDirector:
         block_duration_in_minutes = scheduling_block['block_duration_in_minutes']
         return ((block_start + datetime.timedelta(minutes=block_duration_in_minutes)) - max(datetime.datetime.now(), block_start)).seconds
 
-    # This is just for testing purposes. The real scheduling block information
-    # will come from the program guide/scheduling application.
     def get_scheduling_block(self, datetime_for_consideration):
-        return {
-            'target_video': '/home/pi/video/test_video/Season 01/test_video.S01.E01.mp4' if datetime_for_consideration.minute >= 30 else '/home/pi/video/test_video/Season 01/test_video.S01.E02.mp4',
-            'show_commercials': True,
-            'block_duration_in_minutes': 30,
-            'block_start': self.most_recent_half_hour(datetime_for_consideration)
-        }
+        scheduled_listing = self.scheduler_client.whats_on(
+            channel_number=self.channel_number,
+            querytime=self.most_recent_half_hour(datetime_for_consideration))
+        if scheduled_listing is None:
+            raise ValueError('No listing info available!')
+        return scheduled_listing
 
     # Adapted from the logic found here: https://stackoverflow.com/a/10854034
     def most_recent_half_hour(self, datetime_for_consideration):
@@ -235,15 +271,15 @@ class TechnicalDirector:
 
     def print_queue(self):
         remaining_queue_duration = self.remaining_queue_duration_in_seconds()
-        print(f'Queue depth is {remaining_queue_duration / 60} minutes.')
+        print(f'Queue depth is {round(remaining_queue_duration / 60, 3)} minutes.')
         estimated_airtime = self.estimated_time_at_end_of_current_video()
 
         print('current queue:')
         for index, video in enumerate(self.video_queue):
+            print(f"[{video.batch_label}] <{estimated_airtime}> {video.file_path.split('/')[-1]} ({round(Decimal(video.duration_in_seconds()), 3)}s)")
             video_duration_seconds = int(video.duration_in_seconds())
             video_duration_milliseconds = int((video.duration_in_seconds() - video_duration_seconds) * 1000)
             estimated_airtime = estimated_airtime + datetime.timedelta(seconds=video_duration_seconds, milliseconds=video_duration_milliseconds)
-            print(f"[{video.batch_label}] <{estimated_airtime}> {video.file_path.split('/')[-1]} ({round(Decimal(video.duration_in_seconds()), 3)}s)")
 
 
     def queue_fill_advance_and_sleep_loop(self):
@@ -257,6 +293,11 @@ class TechnicalDirector:
                 queue_feed_time = self.estimated_time_at_end_of_current_video()
                 remaining_seconds = int(remaining_queue_duration)
                 remaining_milliseconds = int((remaining_queue_duration - remaining_seconds) * 1000)
+
+
+
+                # TODO: Ensure this is into the next timeslot. Don't feed the
+                # queue with what's already playing.
                 self.feed_queue(queue_feed_time + datetime.timedelta(seconds=remaining_seconds, milliseconds=remaining_milliseconds))
 
             # Advance the queue if it's ready.
@@ -265,13 +306,6 @@ class TechnicalDirector:
                 self.play_next_video()
 
             time.sleep(0.5)
-
-# Hide the mouse cursor so it is not visible if the desktop is shown.
-# Unfortunately, the desktop makes an appearance between videos. We mitigate
-# the effects of this by hiding the task bar, making the background a solid
-# black, and moving the mouse out of view.
-pyautogui.FAILSAFE = False
-pyautogui.moveTo(pyautogui.size())
 
 # Create our TechnicalDirector instance
 td = TechnicalDirector()
