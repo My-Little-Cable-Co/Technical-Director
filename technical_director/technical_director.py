@@ -22,7 +22,7 @@ def detect_channel_number() -> str:
 
     # If we can't get the channel number from the environment, try and parse
     # it from the hostname based on the MyLittleCableCo hostnaming convention.
-    match = re.match(r"mlcc-(\d+).local", socket.gethostname())
+    match = re.match(r"mlcc-(\d+).*", socket.gethostname())
     if match:
         return match.group(1)
 
@@ -54,7 +54,11 @@ class TechnicalDirector:
         scheduling_block = self.get_scheduling_block(time_at_queue_completion)
 
         # Get a Video object for the video that should be airing.
-        target_video = Video(scheduling_block['file_path'], label=str(scheduling_block['listing_id']))
+        if scheduling_block['file_path'] is None:
+            target_video = Video.default_video()
+            scheduling_block['show_commercials'] = False
+        else:
+            target_video = Video(scheduling_block['file_path'], label=str(scheduling_block['listing_id']))
 
         # See how much time is left in the programming block.
         # Example:

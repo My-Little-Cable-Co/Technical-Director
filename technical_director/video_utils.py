@@ -42,7 +42,7 @@ def get_default_video_filepath(channel_number=None) -> str:
 
     # Form the ffmpeg command to generate the test file
     cmd = FFmpeg(
-        inputs={None: f"-f lavfi -i smptebars=size=640x480,drawtext=text='{video_caption}':font='mono|bold':fontcolor=white:fontsize=42:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2 -t 30"},
+        inputs={None: f"-f lavfi -i smptebars=size=640x480,drawtext=text='{video_caption}':font='mono|bold':fontcolor=white:fontsize=42:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2 -t 1800"},
         outputs={default_video_file: None}
     )
     stdout, stderr = cmd.run(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

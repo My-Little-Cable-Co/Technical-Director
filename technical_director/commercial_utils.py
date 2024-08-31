@@ -34,7 +34,7 @@ def get_commercial_break(target_duration_in_seconds):
         # If the chosen commercial would put us more than ten seconds over our
         # time budget, do not use it. If we exceed five attempts just give up
         # and use whatever.
-        if ((actual_duration + Decimal(commercials[random_index]['duration'])) - target_duration_in_seconds) > 10:
+        if ((actual_duration + Decimal(commercials[random_index]['duration'])) - Decimal(target_duration_in_seconds)) > 10:
             attempts += 1
             if attempts > 5:
                 commercial = commercials.pop(random_index)
