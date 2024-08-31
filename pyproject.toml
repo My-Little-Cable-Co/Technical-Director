@@ -5,7 +5,7 @@ description = ""
 authors = ["Andrew Duane <andrew.m.duane@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">3.11"
 python-vlc = "^3.0.11115"
 ffmpy = "^0.2.3"
 requests = "^2.32.3"

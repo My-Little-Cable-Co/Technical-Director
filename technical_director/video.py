@@ -9,7 +9,7 @@ from video_utils import (
 class Video:
     @classmethod
     def default_video(cls):
-        return cls(get_default_video_filepath(), duration_in_seconds=30, label='Dead Air')
+        return cls(get_default_video_filepath(), duration_in_seconds=1800, label='Dead Air')
 
     def __init__(self, file_path, batch_label=None, duration_in_seconds=None, label=None):
         self.file_path = file_path

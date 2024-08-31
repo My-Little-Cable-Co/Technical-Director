@@ -31,7 +31,7 @@ class SchedulerClient:
         end_time = arrow.get(target_listing['end_time']).datetime.replace(tzinfo=None)
         block_data = {
             'label': target_listing['title'],
-            'listing_id': target_listing['listing_id'],
+            'listing_id': target_listing.get('listing_id'),
             'file_path': target_listing.get('file_path'),
             'show_commercials': True,
             'block_start': start_time,
