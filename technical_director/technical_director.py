@@ -51,7 +51,20 @@ class TechnicalDirector:
         self.feed_queue()
 
     def feed_queue(self, time_at_queue_completion=datetime.datetime.now()):
-        scheduling_block = self.get_scheduling_block(time_at_queue_completion)
+        try:
+            scheduling_block = self.get_scheduling_block(time_at_queue_completion)
+        except Exception as e:
+            # TODO: Make this more specific in what it catches.
+            # Don't crash the process if we can't get what's on next, just
+            # queue the default video
+            scheduling_block = {
+                'label': 'Dead Air',
+                'listing_id': '0000',
+                'file_path': None,
+                'show_commercials': False,
+                'block_start': time_at_queue_completion,
+                'block_duration_in_minutes': 30,
+            }
 
         # Get a Video object for the video that should be airing.
         if scheduling_block['file_path'] is None:
