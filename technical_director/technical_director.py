@@ -112,7 +112,7 @@ class TechnicalDirector:
             video = self.video_queue.pop(0)
         except IndexError:
             video = Video.default_video()
-        media = self.vlc_controller.vlc_instance.media_new(video.file_path)
+        media = self.vlc_controller.vlc_instance.media_new_path(video.file_path)
         # If start_at_second is specified, we don't bother with chapters,
         # commercials, etc. Just queue the video from the time specified.
         # This usually occurs when there is not enough time in the timeslot
