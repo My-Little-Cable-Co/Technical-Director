@@ -15,5 +15,5 @@ class VLCController:
     def play(self):
         self.player.play()
 
-    def set_mrl(self, mrl, options = []):
-        self.player.set_mrl(mrl, *options)
+    def set_media(self, media):
+        self.player.set_media(media)

@@ -6,7 +6,7 @@ import socket
 import time
 from decimal import Decimal
 
-from vlc import EventType, State
+from vlc import EventType
 from vlc_controller import VLCController
 
 from commercial_utils import get_commercial_break
@@ -101,10 +101,10 @@ class TechnicalDirector:
 
     def react_to_vlc_media_player_end_reached_event(self, event):
         # Hey there. The reason this just sets a flag and doesn't just start
-        # the next video itself is because event handlers are not re-entrant
-        # Attempting to call methods on the player object while reacting to
-        # a player event will cause the player to hang. Instead this just
-        # sets a semaphore that is read during the main loop.
+        # the next video itself is because attempting to call methods on the
+        # player object while reacting to a player event causes the player to
+        # hang. Instead this just sets a semaphore that is read during the main
+        # loop.
         self.should_move_to_next_video = True
 
     def play_next_video(self):
@@ -120,13 +120,12 @@ class TechnicalDirector:
         # Well, it can happen if you turn your channel on in the middle of a
         # timeslot. In this case it would be like the content had been playing,
         # it finishes exactly on time.
-        options = []
         if video.start_at_second:
-            options.append(f':start-time={round(Decimal(video.start_at_second), 3)}')
+            media.add_option(f':start-time={round(Decimal(video.start_at_second), 3)}')
         if video.end_at_second:
-            options.append(f":stop-time={round(Decimal(video.end_at_second), 3)}")
+            media.add_option(f":stop-time={round(Decimal(video.end_at_second), 3)}")
 
-        self.vlc_controller.set_mrl(media.get_mrl(), options)
+        self.vlc_controller.set_media(media)
 
         self.vlc_controller.play()
         self.current_video_started = datetime.datetime.now()
@@ -301,9 +300,6 @@ class TechnicalDirector:
 
 
     def queue_fill_advance_and_sleep_loop(self):
-
-        beats_since_reaching_end = 0
-
         while True:
             remaining_queue_duration = self.remaining_queue_duration_in_seconds()
             if remaining_queue_duration < (30 * 60):
@@ -315,6 +311,8 @@ class TechnicalDirector:
                 remaining_seconds = int(remaining_queue_duration)
                 remaining_milliseconds = int((remaining_queue_duration - remaining_seconds) * 1000)
 
+
+
                 # TODO: Ensure this is into the next timeslot. Don't feed the
                 # queue with what's already playing.
                 self.feed_queue(queue_feed_time + datetime.timedelta(seconds=remaining_seconds, milliseconds=remaining_milliseconds))
@@ -323,16 +321,6 @@ class TechnicalDirector:
             if self.should_move_to_next_video:
                 self.should_move_to_next_video = False
                 self.play_next_video()
-
-            # I haven't figured out why, but sometimes the player will get stuck in the "Playing"
-            # state, even though the video has played completely. When we recognize we've been in
-            # this situation for two trips through the main loop, we'll manually intervene and move
-            # to the next video.
-            if self.vlc_controller.player.get_state() == State.Playing and self.vlc_controller.player.get_position() > 1:
-                beats_since_reaching_end += 1
-                if beats_since_reaching_end > 2:
-                    self.should_move_to_next_video = True
-                    beats_since_reaching_end = 0
 
             time.sleep(0.5)
 
