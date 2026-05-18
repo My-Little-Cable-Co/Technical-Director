@@ -99,7 +99,7 @@ class TechnicalDirector:
                 block_duration_in_seconds=scheduling_block['block_duration_in_minutes'] * 60)
         self.print_queue()
 
-    def react_to_vlc_media_player_end_reached_event(self, event):
+    def react_to_vlc_stopping(self, event):
         # Hey there. The reason this just sets a flag and doesn't just start
         # the next video itself is because attempting to call methods on the
         # player object while reacting to a player event causes the player to
@@ -319,8 +319,13 @@ class TechnicalDirector:
 
             # Advance the queue if it's ready.
             if self.should_move_to_next_video:
-                self.should_move_to_next_video = False
-                self.play_next_video()
+                # Make sure we are responding to the same event twice (or two
+                # different events spawned from the same action) by verifying
+                # it has been at least a second since the video started.
+                elapsed = (datetime.datetime.now() - self.current_video_started).total_seconds()
+                if elapsed > 1.0:
+                    self.should_move_to_next_video = False
+                    self.play_next_video()
 
             time.sleep(0.5)
 
@@ -328,9 +333,11 @@ class TechnicalDirector:
 td = TechnicalDirector()
 
 # Attach an event listener to the VLC player so that we can play the next video
-# as soon as VLC reports that the in progress one has finished.
+# as soon as VLC reports that the in progress one has stopped for any reason
 events = td.vlc_controller.player.event_manager()
-events.event_attach(EventType.MediaPlayerEndReached, td.react_to_vlc_media_player_end_reached_event)
+events.event_attach(EventType.MediaPlayerEndReached, td.react_to_vlc_stopping)
+events.event_attach(EventType.MediaPlayerEncounteredError, td.react_to_vlc_stopping)
+events.event_attach(EventType.MediaPlayerStopped, td.react_to_vlc_stopping)
 
 # Hit play
 td.play_next_video()
