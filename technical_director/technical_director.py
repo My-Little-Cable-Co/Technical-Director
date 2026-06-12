@@ -51,6 +51,8 @@ class TechnicalDirector:
         self.feed_queue()
 
     def feed_queue(self, time_at_queue_completion=datetime.datetime.now()):
+        # TODO: I think time_at_queue_completion's default value is only evaluated at script load time
+        print(f'%%FEEDING QUEUE: time_at_queue_completion: {time_at_queue_completion}')
         try:
             scheduling_block = self.get_scheduling_block(time_at_queue_completion)
         except Exception as e:
@@ -113,6 +115,7 @@ class TechnicalDirector:
         except IndexError:
             video = Video.default_video()
         media = self.vlc_controller.vlc_instance.media_new_path(video.file_path)
+        print(f">> STARTING {video.file_path.split('/')[-1]} ({round(Decimal(video.duration_in_seconds()), 3)}s)")
         # If start_at_second is specified, we don't bother with chapters,
         # commercials, etc. Just queue the video from the time specified.
         # This usually occurs when there is not enough time in the timeslot
