@@ -15,8 +15,8 @@ fi
 cd /home/mlcc/src/Technical-Director
 
 # Pull the latest version of the code, discarding any local changes.
-#git fetch --all
-#git reset --hard origin/main
+git fetch --all
+git reset --hard origin/main
 
 # Wait for the scheduling server to start
 if ! curl --output /dev/null --silent --head --fail $SCHEDULER_URL; then
@@ -32,4 +32,3 @@ until DISPLAY=:0 poetry run python -u technical_director/technical_director.py &
     echo "TD process exited. Restarting..." >> /home/mlcc/technical_director.log
     sleep 1
 done
-
