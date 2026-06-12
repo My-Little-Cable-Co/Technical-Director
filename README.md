@@ -61,30 +61,8 @@ Pi 3B+.
     * Hide the wastebasket and network share icons from the desktop
     * Make the task bar small, and change its color to black
 9. Make a startup script to run Technical Director on boot
-    * Here's the script I use, I name this file `launch-technical-director.sh`:
-    * ```bash
-      #! /bin/bash
-
-      set -e
-
-      # Ensure the repo has been cloned
-      if [ ! -d /home/mlcc/src/Technical-Director ]; then
-              mkdir -p /home/mlcc/src/
-              cd /home/mlcc/src/
-              git clone https://github.com/My-Little-Cable-Co/Technical-Director.git
-      fi
-
-      # cd to the repo directory
-      cd /home/mlcc/src/Technical-Director
-
-      # Pull the latest version of the code, discarding any local changes.
-      git fetch --all
-      git reset --hard origin/main
-
-      poetry install
-      DISPLAY=:0 SCHEDULER_URL=http://mlcc-03.local:3000 poetry run python technical_director/technical_director.py &> /home/mlcc/technical_director.log &
-      ```
-    * Make sure that script is executable, and note that you will need to change the SCHEDULER_URL in the last line to point to your running [Scheduler](https://github.com/My-Little-Cable-Co/Scheduler) server.
+    * An example script is provided, see: `launch-technical-director.sh.example`.
+    * Make sure that script is executable, and note that you will need to change the SCHEDULER_URL to point to your running [Scheduler](https://github.com/My-Little-Cable-Co/Scheduler) server.
     * Make an LXDE autostart script to call `launch-technical-director.sh`. (This also configures unclutter to hide the mouse cursor at boot)
     * ```bash
       echo -e "@lxpanel --profile LXDE-pi\n@pcmanfm --desktop --profile LXDE-pi\n@unclutter -idle 0\n@bash /home/mlcc/launch-technical-director.sh\n@xscreensaver -no-splash" > ~/.config/lxsession/LXDE-pi/autostart
