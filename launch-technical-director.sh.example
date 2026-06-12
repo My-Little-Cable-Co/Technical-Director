@@ -1,0 +1,34 @@
+#! /bin/bash
+
+set -e
+
+export SCHEDULER_URL=http://mlcc-03.local:3000
+
+# Ensure the repo has been cloned
+if [ ! -d /home/mlcc/src/Technical-Director ]; then
+    mkdir -p /home/mlcc/src/
+    cd /home/mlcc/src/
+    git clone https://github.com/My-Little-Cable-Co/Technical-Director.git
+fi
+
+# cd to the repo directory
+cd /home/mlcc/src/Technical-Director
+
+# Pull the latest version of the code, discarding any local changes.
+git fetch --all
+git reset --hard origin/main
+
+# Wait for the scheduling server to start
+if ! curl --output /dev/null --silent --head --fail $SCHEDULER_URL; then
+    echo -n "Waiting for the scheduler server to start up..." >> /home/mlcc/technical_director.log
+    until curl --output /dev/null --silent --head --fail $SCHEDULER_URL; do
+        echo -n "." >> /home/mlcc/technical_director.log
+        sleep 2
+    done
+fi
+
+poetry install
+until DISPLAY=:0 poetry run python -u technical_director/technical_director.py &>> /home/mlcc/technical_director.log; do
+    echo "TD process exited. Restarting..." >> /home/mlcc/technical_director.log
+    sleep 1
+done

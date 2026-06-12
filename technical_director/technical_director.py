@@ -3,6 +3,7 @@ import os
 import random
 import re
 import socket
+import sys
 import time
 from decimal import Decimal
 
@@ -12,7 +13,6 @@ from vlc_controller import VLCController
 from commercial_utils import get_commercial_break
 from scheduler_client import SchedulerClient
 from video import Video
-
 
 def detect_channel_number() -> str:
     # If CHANNEL_NUMBER is set in the ENV, use it.
@@ -51,6 +51,8 @@ class TechnicalDirector:
         self.feed_queue()
 
     def feed_queue(self, time_at_queue_completion=datetime.datetime.now()):
+        # TODO: I think time_at_queue_completion's default value is only evaluated at script load time
+        print(f'%%FEEDING QUEUE: time_at_queue_completion: {time_at_queue_completion}')
         try:
             scheduling_block = self.get_scheduling_block(time_at_queue_completion)
         except Exception as e:
@@ -113,6 +115,7 @@ class TechnicalDirector:
         except IndexError:
             video = Video.default_video()
         media = self.vlc_controller.vlc_instance.media_new_path(video.file_path)
+        print(f">> STARTING {video.file_path.split('/')[-1]} ({round(Decimal(video.duration_in_seconds()), 3)}s)")
         # If start_at_second is specified, we don't bother with chapters,
         # commercials, etc. Just queue the video from the time specified.
         # This usually occurs when there is not enough time in the timeslot
@@ -298,9 +301,19 @@ class TechnicalDirector:
             video_duration_milliseconds = int((video.duration_in_seconds() - video_duration_seconds) * 1000)
             estimated_airtime = estimated_airtime + datetime.timedelta(seconds=video_duration_seconds, milliseconds=video_duration_milliseconds)
 
-
     def queue_fill_advance_and_sleep_loop(self):
         while True:
+            # Detect a lack of video progression: sometimes the player keeps
+            # playing past the video length for some reason.
+            elapsed = (datetime.datetime.now() - self.current_video_started).total_seconds()
+
+            if (Decimal(elapsed) - self.current_video_duration_in_seconds) > 10:
+                print(f"[ERROR] <{datetime.datetime.now()}>: Player didn't stop when the video was over, intervening!")
+                # Calling stop() on the vlc player does not have an effect, so
+                # we'll just bail with an error status and let the process
+                # monitor restart a fresh process. Usually only takes a second.
+                sys.exit(1)
+
             remaining_queue_duration = self.remaining_queue_duration_in_seconds()
             if remaining_queue_duration < (30 * 60):
                 # The queue has less than thirty minutes of content lined up.
@@ -311,15 +324,13 @@ class TechnicalDirector:
                 remaining_seconds = int(remaining_queue_duration)
                 remaining_milliseconds = int((remaining_queue_duration - remaining_seconds) * 1000)
 
-
-
                 # TODO: Ensure this is into the next timeslot. Don't feed the
                 # queue with what's already playing.
                 self.feed_queue(queue_feed_time + datetime.timedelta(seconds=remaining_seconds, milliseconds=remaining_milliseconds))
 
             # Advance the queue if it's ready.
             if self.should_move_to_next_video:
-                # Make sure we are responding to the same event twice (or two
+                # Make sure we aren't responding to the same event twice (or two
                 # different events spawned from the same action) by verifying
                 # it has been at least a second since the video started.
                 elapsed = (datetime.datetime.now() - self.current_video_started).total_seconds()
