@@ -330,7 +330,7 @@ class TechnicalDirector:
 
             # Advance the queue if it's ready.
             if self.should_move_to_next_video:
-                # Make sure we are responding to the same event twice (or two
+                # Make sure we aren't responding to the same event twice (or two
                 # different events spawned from the same action) by verifying
                 # it has been at least a second since the video started.
                 elapsed = (datetime.datetime.now() - self.current_video_started).total_seconds()
