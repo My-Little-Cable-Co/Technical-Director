@@ -3,6 +3,7 @@ import os
 import random
 import re
 import socket
+import sys
 import time
 from decimal import Decimal
 
@@ -12,7 +13,6 @@ from vlc_controller import VLCController
 from commercial_utils import get_commercial_break
 from scheduler_client import SchedulerClient
 from video import Video
-
 
 def detect_channel_number() -> str:
     # If CHANNEL_NUMBER is set in the ENV, use it.
@@ -301,9 +301,19 @@ class TechnicalDirector:
             video_duration_milliseconds = int((video.duration_in_seconds() - video_duration_seconds) * 1000)
             estimated_airtime = estimated_airtime + datetime.timedelta(seconds=video_duration_seconds, milliseconds=video_duration_milliseconds)
 
-
     def queue_fill_advance_and_sleep_loop(self):
         while True:
+            # Detect a lack of video progression: sometimes the player keeps
+            # playing past the video length for some reason.
+            elapsed = (datetime.datetime.now() - self.current_video_started).total_seconds()
+
+            if (Decimal(elapsed) - self.current_video_duration_in_seconds) > 10:
+                print(f"[ERROR] <{datetime.datetime.now()}>: Player didn't stop when the video was over, intervening!")
+                # Calling stop() on the vlc player does not have an effect, so
+                # we'll just bail with an error status and let the process
+                # monitor restart a fresh process. Usually only takes a second.
+                sys.exit(1)
+
             remaining_queue_duration = self.remaining_queue_duration_in_seconds()
             if remaining_queue_duration < (30 * 60):
                 # The queue has less than thirty minutes of content lined up.
@@ -313,8 +323,6 @@ class TechnicalDirector:
                 queue_feed_time = self.estimated_time_at_end_of_current_video()
                 remaining_seconds = int(remaining_queue_duration)
                 remaining_milliseconds = int((remaining_queue_duration - remaining_seconds) * 1000)
-
-
 
                 # TODO: Ensure this is into the next timeslot. Don't feed the
                 # queue with what's already playing.
